@@ -1,50 +1,36 @@
 # package version
 get_version <- function() {
-  if ("vosonSML" %in% loadedNamespaces()) return(utils::packageVersion("vosonSML"))
+  if ("vosonSML" %in% loadedNamespaces()) {
+    return(utils::packageVersion("vosonSML"))
+  }
   "_"
 }
 
 # get package ua
 vsml_ua <- function() {
-  gum("vosonSML v{get_version()}",
-      " (R{as.character(R.version['major'])}.{as.character(R.version['minor'])};",
-      "{as.character(R.version['platform'])})")
-}
-
-# save collect opts
-get_env_opts <- function() {
-  opts <- list(
-    enc = getOption("encoding"),
-    ua = getOption("HTTPUserAgent"),
-    tz = Sys.timezone()
-  )
-}
-
-# set collect opts
-set_collect_opts <- function(opts = NULL) {
-  if (is.null(opts)) {
-    options(encoding = "UTF-8")
-    options(HTTPUserAgent = vsml_ua())
-    Sys.setenv(TZ = "Etc/UTC")
-  } else {
-    options(encoding = opts$enc)
-    options(HTTPUserAgent = opts$ua)
-    Sys.setenv(TZ = opts$tz)
-  }
-  invisible()
+  paste0("vosonSML v.", get_version(), " (R Package)")
 }
 
 # return a file name with system time prefix
-sys_time_filename <- function(name_suffix, name_ext, current_time = NULL, clean = FALSE) {
-    
-    if (is.null(current_time)) current_time <- Sys.time()
+sys_time_filename <-
+  function(name_suffix,
+           name_ext,
+           current_time = NULL,
+           clean = FALSE) {
+    if (is.null(current_time)) {
+      current_time <- Sys.time()
+    }
 
     if (clean) {
       name_suffix <- stringr::str_replace_all(name_suffix, "[\\s:]", "_")
       name_ext <- stringr::str_remove_all(name_ext, "[\\s:\\.]")
     }
 
-    paste0(format(current_time, "%Y-%m-%d_%H%M%S"), "-", name_suffix, ".", name_ext)
+    paste0(format(current_time, "%Y-%m-%d_%H%M%S"),
+           "-",
+           name_suffix,
+           ".",
+           name_ext)
   }
 
 data_path <- function(x = getOption("voson.data")) {
@@ -60,13 +46,6 @@ data_path <- function(x = getOption("voson.data")) {
   NULL
 }
 
-# check writeToFile option
-write_opt <- function(opt = "voson.save", default = FALSE) {
-  opt_save <- getOption(opt)
-  if (!is.na(opt_save) && is.logical(opt_save)) return(opt_save)
-  default
-}
-
 # write data to file in supported file format
 write_output_file <-
   function(data,
@@ -75,6 +54,7 @@ write_output_file <-
            datetime = TRUE,
            verbose = FALSE,
            log = NULL) {
+    msg <- f_verbose(verbose)
 
     set_path <- function(x) x
     data_path <- data_path()
@@ -145,10 +125,25 @@ write_output_file <-
   }
 
 # get the length of the longest character value in a list
-max_chrlen_in_list <- function(x) max(stringr::str_length(x))
+max_chrlen_in_list <- function(lst) {
+  i <- 0
+  sapply(lst, function(x) {
+    if (nchar(as.character(x)) > i)
+      i <<- nchar(x)
+  })
+  i
+}
 
 # pad a character string with spaces
-pad_to_len <- function(x, to_len) stringr::str_pad(x, to_len, side = "right")
+pad_to_len <- function(value, to_len) {
+  value_len <- nchar(as.character(value))
+  if (value_len < to_len) {
+    return(paste0(value, paste0(
+      replicate(to_len - value_len, ""), collapse = " "
+    ), " "))
+  }
+  as.character(value)
+}
 
 # format and print summary dataframe
 print_summary <- function(df) {
@@ -160,11 +155,12 @@ print_summary <- function(df) {
       ifelse(is.na(x), "-", x)
     })
     temp_len <- max_chrlen_in_list(df[[i]])
-    col_len[i] <- ifelse(temp_len > col_len[i], temp_len, col_len[i])
+    col_len[i] <-
+      ifelse(temp_len > col_len[i], temp_len, col_len[i])
   }
 
-  header <- paste0(
-    sapply(col_names, function(x) {
+  header <-
+    paste0(sapply(col_names, function(x) {
       pad_to_len(x, col_len[match(c(x), col_names)])
     }), collapse = " | ")
 
@@ -176,7 +172,10 @@ print_summary <- function(df) {
     line <- ""
     values <- as.character(as.vector(df[i,]))
     for (j in 1:length(values)) {
-      line <- paste0(line, pad_to_len(values[j], col_len[j]), ifelse(j < length(values), " | ", ""))
+      line <-
+        paste0(line,
+               pad_to_len(values[j], col_len[j]),
+               ifelse(j < length(values), " | ", ""))
     }
     lines <- paste0(lines, line, "\n")
   }
@@ -237,6 +236,11 @@ network_stats <-
           stringsAsFactors = FALSE)
   }
 
+# remove collect classes from list
+rm_collect_cls <- function(cls_lst) {
+  cls_lst[!cls_lst %in% c("datasource", "twitter", "youtube", "reddit", "web")]
+}
+
 # check packages and prompt to install if interactive
 # stop if not installed
 prompt_and_stop <- function(pkgs, f) {
@@ -272,72 +276,50 @@ escape_regex <- function(x) {
 
 ## -- output messaging
 
-# shorter glue
-gum <- stringr::str_glue
-gum_data <- stringr::str_glue_data
+# assign message function for verbose output
+f_verbose <- function(x) {
+  opt_msg <- getOption("voson.msg")
 
-msg_check_opts <- function(opt = "voson.cat", default = FALSE) {
-  opt_cat <- getOption(opt)
-  if (!is.na(opt_cat) && is.logical(opt_cat)) return(opt_cat)
-  default
-}
+  opt_f <- vsml_msg
 
-# check voson.cat options
-msg_use_cat <- function() {
-  opt_msg <- msg_check_opts(opt = "voson.msg") # previous
-  opt_cat <- msg_check_opts(opt = "voson.cat")
-  
-  if (opt_msg == FALSE & opt_cat == TRUE) return(TRUE)
-  FALSE
+  # check if cat option set
+  if (!is.null(opt_msg) && !is.na(opt_msg)) {
+    if (is.logical(opt_msg)) {
+      if (opt_msg == FALSE) {
+        opt_f <- vsml_cat
+      }
+    }
+  }
+
+  f <- vsml_silent
+  if (!is.null(x)) {
+    if (is.logical(x)) {
+      f <- ifelse(x, opt_f, vsml_silent)
+    }
+  }
+  f
 }
 
 # base output function
-msg <- function(x, ..., .x = "-", .xenvir = parent.frame(), .verbose = NULL) {
-  
-  if (!is.null(.verbose)) {
-    verbose <- .verbose
-  } else {
-    verbose <- .xenvir$verbose
-  }
-
-  # if not verbose only continue if warning or danger
-  if (is.null(verbose) || verbose == FALSE) {
-    if (!.x %in% c("warning", "danger")) return(invisible(x))
-  }
-  
-  # interpolate
-  # x_ <- gum(x, ..., .envir = .xenvir)
-  x_ <- x
-  
-  if (!msg_use_cat()) {
-    vsml_msg(x_, .x, appendLF = FALSE)
-    
-    # if cat output
-  } else {
-    vsml_cat(x_, .x)
-  }
-  
-  invisible(x_)
+msg <- function(x) {
+  vsml_msg(x)
 }
 
 # message output
-vsml_msg <- function(x, .x = "-", ...) {
-  if (.x %in% c("warning", "danger")) {
-    warning(x, call. = FALSE, noBreaks. = TRUE)
-  } else {
-    # appendLF = FALSE
-    message(x, ...)
-  }
-  invisible(x)
+vsml_msg <- function(x) {
+  message(x, appendLF = FALSE)
 }
 
 # cat output
-vsml_cat <- function(x, .x = "-") {
-  if (.x %in% c("warning", "danger")) x <- paste0("!", .x, ":", x)
+vsml_cat <- function(x) {
   cat(x)
   flush.console()
   Sys.sleep(0.05)
-  invisible(x)
+}
+
+# silent output
+vsml_silent <- function(x) {
+  return()
 }
 
 # check debug parameter
@@ -505,6 +487,96 @@ check_chr <-
     stop(paste0(param, " must be of character type."), call. = FALSE)
   }
 
-rev_row_order <- function(x) {
-  x[nrow(x):1, ]
+# prototype mask vector of character strings
+# rx_match = ^@ for twitter users
+mask_chr <- function(x,
+                     rx.match = ".",
+                     len.max = NULL,
+                     preserve = 3,
+                     block = NULL,
+                     shuffle = TRUE,
+                     x.upper = NULL,
+                     x.lower = NULL,
+                     x.digit = NULL) {
+
+  if (!is.null(len.max)) x <- stringr::str_sub(x, end = len.max)
+
+  # shuffle chrs
+  shuffle_ <- function(y, m, p) {
+    # ifelse(
+    #   stringr::str_detect(y, m),
+    #   paste0(
+    #     stringr::str_sub(y, 1, p),
+    #
+    #     stringi::stri_rand_shuffle(stringr::str_sub(y, p + 1, nchar(y)))
+    #
+    #   ),
+    #   y
+    # )
+
+    # without stri
+    y <- ifelse(stringr::str_detect(y, m), stringr::str_split(y, ""), y)
+    y <- sapply(y, function(z) {
+      if (length(z) > 1) {
+        z <- paste0(
+          c(z[1:p], sample(z[(p + 1):length(z)])),
+          collapse = ""
+        )
+        z
+      } else {
+        z
+      }
+    })
+
+    y
+  }
+
+  # if block chrs
+  if (!is.null(block)) {
+    if (shuffle)
+      x <- shuffle_(x, rx.match, 1)
+
+    x <- ifelse(
+      stringr::str_detect(x, rx.match),
+      paste0(
+        stringr::str_sub(x, 1, preserve),
+        stringr::str_replace_all(
+          stringr::str_sub(x, preserve + 1, nchar(x) - preserve),
+          ".",
+          block
+        ),
+        stringr::str_sub(x, nchar(x) - (preserve - 1), nchar(x))
+      ),
+      x
+    )
+
+    return(x)
+  }
+
+  # replace chrs
+  l <- sample(letters, 20)
+  d <- round(runif(6, min = 0, max = 9))
+
+  rx_digit <- paste0("[", paste0(d, collapse = ""), "]")
+  rx_lower <- paste0("[", paste0(l[1:10], collapse = ""), "]")
+  rx_upper <- paste0("[", paste0(l[11:20], collapse = ""), "]")
+
+  if (shuffle) x <- shuffle_(x, rx.match, preserve)
+
+  repl_ <- function(y, m, p, rx, v) {
+    ifelse(
+      stringr::str_detect(y, m),
+      paste0(
+        stringr::str_sub(y, 1, p),
+        stringr::str_replace_all(stringr::str_sub(y, p + 1, nchar(y)), rx, v)
+      ),
+      y
+    )
+  }
+
+  if (!is.null(x.digit)) x <- repl_(x, rx.match, preserve, rx_digit, x.digit)
+  if (!is.null(x.lower)) x <- repl_(x, rx.match, preserve, rx_lower, x.lower)
+  if (!is.null(x.upper)) x <- repl_(x, rx.match, preserve, rx_upper, x.upper)
+
+  x
 }

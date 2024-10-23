@@ -595,3 +595,11 @@ set_collect_opts <- function(opts = NULL) {
   invisible()
 }
 
+# save collect opts
+get_env_opts <- function() {
+  opts <- list(
+    enc = getOption("encoding"),
+    ua = getOption("HTTPUserAgent"),
+    tz = Sys.timezone()
+  )
+}

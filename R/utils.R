@@ -580,3 +580,18 @@ mask_chr <- function(x,
 
   x
 }
+
+# set collect opts
+set_collect_opts <- function(opts = NULL) {
+  if (is.null(opts)) {
+    options(encoding = "UTF-8")
+    options(HTTPUserAgent = vsml_ua())
+    Sys.setenv(TZ = "Etc/UTC")
+  } else {
+    options(encoding = opts$enc)
+    options(HTTPUserAgent = opts$ua)
+    Sys.setenv(TZ = opts$tz)
+  }
+  invisible()
+}
+
